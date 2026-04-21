@@ -70,6 +70,18 @@ fi
 
 # ── Launch: try each availability domain in sequence ─────────────────────────
 
+# Build JSON parameters safely using Python — avoids shell escaping issues with
+# the SSH public key (which contains spaces, slashes, and base64 padding).
+METADATA=$(python3 -c "
+import json, os
+print(json.dumps({'ssh_authorized_keys': os.environ['SSH_PUBLIC_KEY']}))
+")
+
+SHAPE_CONFIG=$(python3 -c "
+import json, os
+print(json.dumps({'ocpus': int(os.environ['FREE_OCPUS']), 'memoryInGBs': int(os.environ['FREE_MEMORY_GB'])}))
+" FREE_OCPUS="${FREE_OCPUS}" FREE_MEMORY_GB="${FREE_MEMORY_GB}")
+
 IFS=',' read -ra ADS <<< "$AVAILABILITY_DOMAINS"
 CAPACITY_FAILURES=0
 
@@ -82,14 +94,14 @@ for AD in "${ADS[@]}"; do
     --availability-domain     "$AD" \
     --compartment-id          "$COMPARTMENT_ID" \
     --shape                   "$SHAPE" \
-    --shape-config            "{\"ocpus\":${FREE_OCPUS},\"memoryInGBs\":${FREE_MEMORY_GB}}" \
+    --shape-config            "$SHAPE_CONFIG" \
     --image-id                "$IMAGE_ID" \
     --subnet-id               "$SUBNET_ID" \
     --assign-public-ip        true \
     --display-name            "pmtradingbot" \
     --boot-volume-size-in-gbs "${FREE_BOOT_VOL_GB}" \
     --freeform-tags           '{"FreeTier":"true","Project":"pmtradingbot"}' \
-    --metadata                "{\"ssh_authorized_keys\":\"${SSH_PUBLIC_KEY}\"}" \
+    --metadata                "$METADATA" \
     2>&1) && LAUNCH_EXIT=0 || LAUNCH_EXIT=$?
 
   if [ $LAUNCH_EXIT -eq 0 ]; then

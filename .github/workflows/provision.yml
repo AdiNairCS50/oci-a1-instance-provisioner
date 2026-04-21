@@ -35,6 +35,7 @@ jobs:
           EOF
           printf '%s' "${{ secrets.OCI_KEY_PEM }}" > ~/.oci/key.pem
           chmod 600 ~/.oci/key.pem
+          chmod 600 ~/.oci/config
 
       - name: Attempt provisioning
         id: provision

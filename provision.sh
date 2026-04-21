@@ -70,17 +70,13 @@ fi
 
 # ── Launch: try each availability domain in sequence ─────────────────────────
 
-# Build JSON parameters safely using Python — avoids shell escaping issues with
+# Build metadata JSON safely using Python — avoids shell escaping issues with
 # the SSH public key (which contains spaces, slashes, and base64 padding).
-METADATA=$(python3 -c "
-import json, os
-print(json.dumps({'ssh_authorized_keys': os.environ['SSH_PUBLIC_KEY']}))
-")
+# SSH_PUBLIC_KEY is injected as an environment variable by the workflow.
+METADATA=$(python3 -c "import json,os; print(json.dumps({'ssh_authorized_keys': os.environ['SSH_PUBLIC_KEY']}))")
 
-SHAPE_CONFIG=$(python3 -c "
-import json, os
-print(json.dumps({'ocpus': int(os.environ['FREE_OCPUS']), 'memoryInGBs': int(os.environ['FREE_MEMORY_GB'])}))
-" FREE_OCPUS="${FREE_OCPUS}" FREE_MEMORY_GB="${FREE_MEMORY_GB}")
+# Shape config is static — hardcode directly, no interpolation needed.
+SHAPE_CONFIG="{\"ocpus\":${FREE_OCPUS},\"memoryInGBs\":${FREE_MEMORY_GB}}"
 
 IFS=',' read -ra ADS <<< "$AVAILABILITY_DOMAINS"
 CAPACITY_FAILURES=0

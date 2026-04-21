@@ -1,0 +1,65 @@
+name: OCI A1 Instance Provisioner
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: oci-provision
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      actions: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OCI CLI
+        run: pip install oci-cli --quiet
+
+      - name: Configure OCI credentials
+        run: |
+          mkdir -p ~/.oci
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=${{ secrets.OCI_USER_OCID }}
+          fingerprint=${{ secrets.OCI_FINGERPRINT }}
+          tenancy=${{ secrets.OCI_TENANCY_OCID }}
+          region=${{ secrets.OCI_REGION }}
+          key_file=/home/runner/.oci/key.pem
+          EOF
+          printf '%s' "${{ secrets.OCI_KEY_PEM }}" > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+
+      - name: Attempt provisioning
+        id: provision
+        run: bash provision.sh
+        env:
+          COMPARTMENT_ID:       ${{ secrets.OCI_COMPARTMENT_ID }}
+          SUBNET_ID:            ${{ secrets.OCI_SUBNET_ID }}
+          IMAGE_ID:             ${{ secrets.OCI_IMAGE_ID }}
+          SSH_PUBLIC_KEY:       ${{ secrets.SSH_PUBLIC_KEY }}
+          AVAILABILITY_DOMAINS: ${{ secrets.OCI_AVAILABILITY_DOMAINS }}
+        continue-on-error: true
+
+      - name: Notify and disable on success
+        if: steps.provision.outputs.result == 'success'
+        run: |
+          PUBLIC_IP="${{ steps.provision.outputs.public_ip }}"
+          gh issue create \
+            --title "OCI A1 Instance Provisioned" \
+            --body "$(printf 'Your Ampere A1 instance is live.\n\n**Public IP:** %s\n\nSSH in with:\n```\nssh ubuntu@%s\n```\n\nThis workflow has been disabled automatically.' "$PUBLIC_IP" "$PUBLIC_IP")"
+          gh workflow disable provision.yml
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Fail on unexpected errors
+        if: steps.provision.outputs.result == 'error'
+        run: |
+          echo "Unexpected OCI error — check the logs above"
+          exit 1

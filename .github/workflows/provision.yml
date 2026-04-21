@@ -50,10 +50,9 @@ jobs:
       - name: Notify and disable on success
         if: steps.provision.outputs.result == 'success'
         run: |
-          PUBLIC_IP="${{ steps.provision.outputs.public_ip }}"
           gh issue create \
             --title "OCI A1 Instance Provisioned" \
-            --body "$(printf 'Your Ampere A1 instance is live.\n\n**Public IP:** %s\n\nSSH in with:\n```\nssh ubuntu@%s\n```\n\nThis workflow has been disabled automatically.' "$PUBLIC_IP" "$PUBLIC_IP")"
+            --body "$(printf 'Your Ampere A1 instance is live.\n\nFind the public IP in the OCI Console:\nCompute > Instances > pmtradingbot > Instance Information > Public IP\n\nThis workflow has been disabled automatically.')"
           gh workflow disable provision.yml
         env:
           GH_TOKEN: ${{ github.token }}

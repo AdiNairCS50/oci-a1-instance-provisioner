@@ -21,7 +21,7 @@ echo_output() {
 readonly SHAPE="VM.Standard.A1.Flex"
 readonly FREE_OCPUS=4
 readonly FREE_MEMORY_GB=24
-readonly FREE_BOOT_VOL_GB=47   # OCI minimum; well within 200 GB free storage quota
+readonly FREE_BOOT_VOL_GB=50   # OCI enforced minimum (API rejects anything below 50 GB)
 
 # ── Pre-flight: quota check ───────────────────────────────────────────────────
 # Count OCPUs already allocated to live A1 instances.

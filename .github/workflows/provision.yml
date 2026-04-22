@@ -7,11 +7,12 @@ on:
 
 concurrency:
   group: oci-provision
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   provision:
     runs-on: ubuntu-latest
+    timeout-minutes: 9
     permissions:
       issues: write
       actions: write
@@ -42,6 +43,7 @@ jobs:
       - name: Attempt provisioning
         id: provision
         run: bash provision.sh
+        timeout-minutes: 7
         env:
           COMPARTMENT_ID:       ${{ secrets.OCI_COMPARTMENT_ID }}
           SUBNET_ID:            ${{ secrets.OCI_SUBNET_ID }}

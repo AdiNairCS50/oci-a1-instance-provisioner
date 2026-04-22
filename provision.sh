@@ -80,6 +80,7 @@ SHAPE_CONFIG="{\"ocpus\":${FREE_OCPUS},\"memoryInGBs\":${FREE_MEMORY_GB}}"
 
 IFS=',' read -ra ADS <<< "$AVAILABILITY_DOMAINS"
 CAPACITY_FAILURES=0
+TRANSIENT_FAILURES=0
 
 for AD in "${ADS[@]}"; do
   AD="${AD// /}"
@@ -123,6 +124,10 @@ for AD in "${ADS[@]}"; do
   if echo "$LAUNCH_OUTPUT" | grep -qiE "out of host capacity|InternalError|capacity"; then
     echo "No capacity in $AD — trying next"
     CAPACITY_FAILURES=$((CAPACITY_FAILURES + 1))
+  elif echo "$LAUNCH_OUTPUT" | grep -qiE "The connection to endpoint timed out|timed out|ServiceUnavailable|TooManyRequests|429|5[0-9]{2}"; then
+    # OCI API/network errors are often transient; do not fail the workflow hard.
+    echo "Transient OCI/API error in $AD — trying next"
+    TRANSIENT_FAILURES=$((TRANSIENT_FAILURES + 1))
   else
     echo "Unexpected error in $AD:"
     echo "$LAUNCH_OUTPUT"
@@ -132,7 +137,13 @@ for AD in "${ADS[@]}"; do
 done
 
 echo ""
-echo "No capacity in any availability domain (${CAPACITY_FAILURES}/${#ADS[@]} tried)"
-echo "Will retry on next schedule run."
-echo_output "result" "capacity"
+if [ "$TRANSIENT_FAILURES" -gt 0 ]; then
+  echo "No launch succeeded. Capacity failures: ${CAPACITY_FAILURES}, transient failures: ${TRANSIENT_FAILURES}"
+  echo "Will retry on next schedule run."
+  echo_output "result" "transient"
+else
+  echo "No capacity in any availability domain (${CAPACITY_FAILURES}/${#ADS[@]} tried)"
+  echo "Will retry on next schedule run."
+  echo_output "result" "capacity"
+fi
 exit 0
